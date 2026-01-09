@@ -2,6 +2,8 @@
 
 PassKeeper is a proof-of-concept password manager built with .NET 10 and a GTK-based UI. It is designed to run on both Windows and Linux platforms. The main goal of this project is to explore secure password storage techniques in a cross-platform desktop application.
 
+All data is saved in an encrypted LiteDB database, providing an extra layer of security for stored passwords.
+
 ## Project Objective
 
 The objective of PassKeeper is to store users' passwords as securely as possible, using modern encryption and best practices available within the .NET ecosystem. The project demonstrates how to implement password management and encryption in a desktop application.
@@ -23,6 +25,8 @@ We welcome suggestions and feedback, especially regarding how to improve the sec
 - Cross-platform: Runs on Windows and Linux
 - GTK UI for a native desktop experience
 - Password storage with encryption
+
+- Encrypted LiteDB database for secure local storage
 
 ## Requirements
 

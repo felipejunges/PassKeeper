@@ -8,9 +8,9 @@ namespace PassKeeper.Gtk.Services;
 
 public class DataStore : IDataStore, IDisposable
 {
-    private LiteDatabase _db = null!;
-    private ILiteCollection<Item> _itens = null!;
-    private ILiteCollection<ItemPassword> _passwords = null!;
+    private readonly LiteDatabase _db;
+    private readonly ILiteCollection<Item> _itens;
+    private readonly ILiteCollection<ItemPassword> _passwords;
     private bool _disposed;
     
     public string FullDbPath { get; }
@@ -33,13 +33,25 @@ public class DataStore : IDataStore, IDisposable
 
         FullDbPath = path;
 
-        OpenNewDbConnection(password);
+        var conn = new ConnectionString
+        {
+            Filename = FullDbPath,
+            Password = password
+        };
+        
+        _db = new LiteDatabase(conn);
+        
+        _itens = _db.GetCollection<Item>("items");
+        _passwords = _db.GetCollection<ItemPassword>("passwords");
+        
+        _itens.EnsureIndex<string>(x => x.Title);
     }
 
     public void ChangeDbPassword(string newPassword)
     {
         var currentPassword = _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey);
 
+        // TODO: persistir a senha com uma chave interna (1/3)
         var senhas = _passwords.FindAll().ToList();
         senhas.ForEach(s =>
         {
@@ -64,22 +76,6 @@ public class DataStore : IDataStore, IDisposable
         {
             _db.Dispose();
         }
-
-        OpenNewDbConnection(newPassword);
-    }
-
-    private void OpenNewDbConnection(string newPassword)
-    {
-        var conn = new ConnectionString
-        {
-            Filename = FullDbPath,
-            Password = newPassword
-        };
-        
-        _db = new LiteDatabase(conn);
-        _itens = _db.GetCollection<Item>("items");
-        _passwords = _db.GetCollection<ItemPassword>("passwords");
-        _itens.EnsureIndex<string>(x => x.Title);
     }
 
     public IEnumerable<ItemView> GetAll() => _itens.FindAll().Select(MapToItemView);
@@ -134,6 +130,7 @@ public class DataStore : IDataStore, IDisposable
             return;
 
         // TODO: transformar AesEncryption em uma interface e receber instância via injeção de dependência para ser testável
+        // TODO: persistir a senha com uma chave interna (2/3)
         var itemPassword = new ItemPassword
         {
             Id = itemView.Id,
@@ -150,6 +147,7 @@ public class DataStore : IDataStore, IDisposable
             return string.Empty;
 
         // TODO: transformar AesEncryption em uma interface e receber instância via injeção de dependência para ser testável
+        // TODO: persistir a senha com uma chave interna (3/3)
         return AesEncryption.Decrypt(item.Password, _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey));
     }
 

@@ -1,4 +1,5 @@
 using Gtk;
+using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Dialogs;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Services;
@@ -7,14 +8,18 @@ namespace PassKeeper.Gtk;
 
 public class MainWindow : Window
 {
+    private static readonly ISecretStore SecretStore = new SecretStore("PassKeeper.Gtk");
+    
     private static TreeView? _treeView;
     private static ListStore? _listStore;
-    private static ISecretStore? _secretStore;
     private static IDataStore? _dataStore;
 
+    private readonly string _defaultTitle;
+    private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
+    
     public MainWindow(string title) : base(title)
     {
-        _secretStore = new SecretStore("PassKeeper.Gtk");
+        _defaultTitle = title;
         
         SetDefaultSize(700, 400);
         SetPosition(WindowPosition.Center);
@@ -25,14 +30,7 @@ public class MainWindow : Window
 
         var vbox = new Box(Orientation.Vertical, 2);
 
-        var menuBar = new MenuBar();
-        var fileMenuItem = new MenuItem("File");
-        var fileMenu = new Menu();
-        var exitItem = new MenuItem("Exit");
-
-        fileMenu.Append(exitItem);
-        fileMenuItem.Submenu = fileMenu;
-        menuBar.Append(fileMenuItem);
+        var menuBar = CreateWindowMenuBar();
 
         vbox.PackStart(menuBar, false, false, 0);
 
@@ -81,16 +79,26 @@ public class MainWindow : Window
         addButton.Clicked += OnAddButtonClicked;
         editButton.Clicked += OnEditButtonClicked;
         deleteButton.Clicked += OnDeleteButtonClicked;
-
-        exitItem.Activated += OnExitItemActivated;
     }
 
-    private void OnExitItemActivated(object? o, EventArgs eventArgs)
+    private MenuBar CreateWindowMenuBar()
     {
-        var confirm = new MessageDialog(this, DialogFlags.Modal, MessageType.Question, ButtonsType.YesNo, "Are you sure you want to exit?");
-        int resp = confirm.Run();
-        confirm.Destroy();
-        if (resp == (int)ResponseType.Yes) Application.Quit();
+        var menuBar = new MenuBar();
+        var fileMenuItem = new MenuItem("File");
+        var fileMenu = new Menu();
+        var changeDbPasswordItem = new MenuItem("Change DB password");
+        var exitItem = new MenuItem("Exit");
+
+        fileMenu.Append(changeDbPasswordItem);
+        fileMenu.Append(new SeparatorMenuItem());
+        fileMenu.Append(exitItem);
+        fileMenuItem.Submenu = fileMenu;
+        menuBar.Append(fileMenuItem);
+        
+        changeDbPasswordItem.Activated += OnChangeDbPasswordActivated;
+        exitItem.Activated += OnExitItemActivated;
+        
+        return menuBar;
     }
 
     private void OnAddButtonClicked(object? o, EventArgs eventArgs)
@@ -128,32 +136,32 @@ public class MainWindow : Window
             var idStr = (string)_listStore.GetValue(iter, 0);
             var id = Guid.Parse(idStr);
             var item = _dataStore?.GetById(id);
-            if (item != null)
-            {
-                var dialog = new ItemDialog(this, "Edit Item", item);
+            
+            if (item == null) return;
+            
+            var dialog = new ItemDialog(this, "Edit Item", item);
                 
-                dialog.Response += (_, args) =>
+            dialog.Response += (_, args) =>
+            {
+                if (args.ResponseId == ResponseType.Ok)
                 {
-                    if (args.ResponseId == ResponseType.Ok)
+                    if (!dialog.Validate())
                     {
-                        if (!dialog.Validate())
-                        {
-                            args.RetVal = true;
-                            return;
-                        }
-
-                        // TODO: melhorar, nao deveria ser o Dialog o responsável por atualizar o item
-                        dialog.UpdateItem();
-
-                        _dataStore?.Update(item);
-                        _listStore.SetValues(iter, item.Id.ToString(), item.Title, item.Username, item.Email);
+                        args.RetVal = true;
+                        return;
                     }
 
-                    dialog.Destroy();
-                };
+                    // TODO: melhorar, nao deveria ser o Dialog o responsável por atualizar o item
+                    dialog.UpdateItem();
+
+                    _dataStore?.Update(item);
+                    _listStore.SetValues(iter, item.Id.ToString(), item.Title, item.Username, item.Email);
+                }
+
+                dialog.Destroy();
+            };
                 
-                dialog.ShowAll();
-            }
+            dialog.ShowAll();
         }
     }
     
@@ -204,7 +212,11 @@ public class MainWindow : Window
                     // TODO: melhorar, não parece estar funcionando corretamente
                     GLib.Timeout.Add(30000, () =>
                     {
-                        clipboard.Text = string.Empty;
+                        if (clipboard.WaitForText() == senha)
+                        {
+                            clipboard.Text = string.Empty;
+                        }
+                        
                         return false; // Do not repeat
                     });
                 }
@@ -216,11 +228,41 @@ public class MainWindow : Window
             menu.Popup();
         }
     }
+    
+    private void OnChangeDbPasswordActivated(object? sender, EventArgs e)
+    {
+        // TODO: ask the current password and validate it before changing to a new one
+
+        if (_dataStore == null) return;
+        
+        var keyDialog = new InputDialog(this, "Enter the new key:", initial: "", isPassword: true);
+        if (keyDialog.Run() == (int)ResponseType.Ok)
+        {
+            string value = keyDialog.Text;
+            
+            _dataStore.ChangeDbPassword(value);
+
+            SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
+            
+            OpenNewDbConnection(value);
+            GetItems();
+        }
+
+        keyDialog.Destroy();
+    }
+
+    private void OnExitItemActivated(object? o, EventArgs eventArgs)
+    {
+        var confirm = new MessageDialog(this, DialogFlags.Modal, MessageType.Question, ButtonsType.YesNo, "Are you sure you want to exit?");
+        int resp = confirm.Run();
+        confirm.Destroy();
+        if (resp == (int)ResponseType.Yes) Application.Quit();
+    }
 
     private void OnWindowDestroyed(object? o, EventArgs eventArgs)
     {
         _dataStore?.Dispose();
-        _secretStore?.Dispose();
+        SecretStore.Dispose();
     }
 
     private static void OnWindowDeleteEvent(object o, DeleteEventArgs args)
@@ -233,21 +275,30 @@ public class MainWindow : Window
         var keyDialog = new InputDialog(this, "Enter the key:", initial: "", isPassword: true);
         if (keyDialog.Run() == (int)ResponseType.Ok)
         {
-            if (_secretStore == null) return;
-
             string value = keyDialog.Text;
-            _secretStore.SaveSecret("SEC", value.ToCharArray());
 
-            _dataStore = new DataStore(_secretStore);
-
-            Title += $" - {_dataStore.FullDbPath}";
-
+            OpenNewDbConnection(value);
             GetItems();
         }
 
         keyDialog.Destroy();
     }
-    
+
+    private void OpenNewDbConnection(string password)
+    {
+        if (_dataStore != null)
+        {
+            _dataStore.Dispose();
+            _dataStore = null;
+        }
+
+        SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, password.ToCharArray());
+
+        _dataStore = new DataStore(SecretStore);
+
+        SetDbConnectionTitle(_dataStore.FullDbPath);
+    }
+
     private void OnFilterEntryActivated(object? o, EventArgs eventArgs)
     {
         var filterEntry = o as Entry;
@@ -261,8 +312,9 @@ public class MainWindow : Window
     {
         _listStore?.Clear();
 
-        var itens = _dataStore?.Get(filter);
-        if (itens == null) return;
+        if (_dataStore is null) return;
+        
+        var itens = _dataStore.Get(filter);
 
         foreach (var item in itens)
         {

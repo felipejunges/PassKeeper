@@ -1,4 +1,6 @@
 using LiteDB;
+using LiteDB.Engine;
+using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
 
@@ -6,9 +8,9 @@ namespace PassKeeper.Gtk.Services;
 
 public class DataStore : IDataStore, IDisposable
 {
-    private readonly LiteDatabase _db;
-    private readonly ILiteCollection<Item> _itens;
-    private readonly ILiteCollection<ItemPassword> _passwords;
+    private LiteDatabase _db = null!;
+    private ILiteCollection<Item> _itens = null!;
+    private ILiteCollection<ItemPassword> _passwords = null!;
     private bool _disposed;
     
     public string FullDbPath { get; }
@@ -19,7 +21,7 @@ public class DataStore : IDataStore, IDisposable
     {
         _secretStore = secretStore;
 
-        var password = new string(_secretStore.GetSecret("SEC"));
+        var password = new string(_secretStore.GetSecret(SecretStoreConsts.DbPasswordKey));
 
         if (string.IsNullOrWhiteSpace(password))
             throw new ArgumentException("A non-empty password is required to encrypt the database.", nameof(password));
@@ -31,17 +33,52 @@ public class DataStore : IDataStore, IDisposable
 
         FullDbPath = path;
 
+        OpenNewDbConnection(password);
+    }
+
+    public void ChangeDbPassword(string newPassword)
+    {
+        var currentPassword = _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey);
+
+        var senhas = _passwords.FindAll().ToList();
+        senhas.ForEach(s =>
+        {
+            var decryptedPassword = AesEncryption.Decrypt(s.Password, currentPassword);
+            s.Password = AesEncryption.Encrypt(decryptedPassword, newPassword.ToCharArray());
+            _passwords.Update(s);
+        });
+
+        try
+        {
+            _db.Rebuild(new RebuildOptions
+            {
+                Password = newPassword
+            });
+        }
+        catch (LiteException ex)
+        {
+            if (!ex.Message.Contains("Invalid password"))
+                throw;
+        }
+        finally
+        {
+            _db.Dispose();
+        }
+
+        OpenNewDbConnection(newPassword);
+    }
+
+    private void OpenNewDbConnection(string newPassword)
+    {
         var conn = new ConnectionString
         {
-            Filename = path,
-            Password = password
+            Filename = FullDbPath,
+            Password = newPassword
         };
-
+        
         _db = new LiteDatabase(conn);
-
         _itens = _db.GetCollection<Item>("items");
         _passwords = _db.GetCollection<ItemPassword>("passwords");
-
         _itens.EnsureIndex<string>(x => x.Title);
     }
 
@@ -56,7 +93,12 @@ public class DataStore : IDataStore, IDisposable
         return itens.Select(MapToItemView);
     }
 
-    public ItemView? GetById(Guid id) => MapToItemView(_itens.FindById(id));
+    public ItemView? GetById(Guid id)
+    {
+        var item = _itens.FindById(id);
+
+        return item == null ? null : MapToItemView(item);
+    }
 
     public Guid Add(ItemView itemView)
     {
@@ -95,7 +137,7 @@ public class DataStore : IDataStore, IDisposable
         var itemPassword = new ItemPassword
         {
             Id = itemView.Id,
-            Password = AesEncryption.Encrypt(itemView.Password, _secretStore.GetSecret("SEC"))
+            Password = AesEncryption.Encrypt(itemView.Password, _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey))
         };
 
         _passwords.Upsert(itemPassword);
@@ -108,10 +150,10 @@ public class DataStore : IDataStore, IDisposable
             return string.Empty;
 
         // TODO: transformar AesEncryption em uma interface e receber instância via injeção de dependência para ser testável
-        return AesEncryption.Decrypt(item.Password, _secretStore.GetSecret("SEC"));
+        return AesEncryption.Decrypt(item.Password, _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey));
     }
 
-    private ItemView MapToItemView(Item item)
+    private static ItemView MapToItemView(Item item)
     {
         var itemView = new ItemView
         {
@@ -125,7 +167,7 @@ public class DataStore : IDataStore, IDisposable
         return itemView;
     }
 
-    private Item MapToItem(ItemView itemView)
+    private static Item MapToItem(ItemView itemView)
     {
         var item = new Item
         {

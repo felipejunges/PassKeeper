@@ -1,3 +1,4 @@
+using ErrorOr;
 using PassKeeper.Gtk.Models;
 
 namespace PassKeeper.Gtk.Interfaces.Services;
@@ -12,7 +13,8 @@ public interface IDataStore
     void Update(ItemView itemView);
     void Delete(Guid id);
     long Count();
-    string GetPassword(Guid id);
+    object GetDbConfiguration(string key, object? defaultValue = null);
+    ErrorOr<string> GetPassword(Guid id);
     void Dispose();
     string FullDbPath { get; }
 }

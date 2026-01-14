@@ -185,8 +185,7 @@ public class MainWindow : Window
 
     private void OnTreeViewButtonPressEvent(object o, ButtonPressEventArgs args)
     {
-        var treeView = o as TreeView;
-        if (treeView == null) return;
+        if (o is not TreeView treeView) return;
         
         if (args.Event.Button == 3) // Right mouse button
         {
@@ -198,11 +197,20 @@ public class MainWindow : Window
                 if (treeView.Selection.GetSelected(out TreeIter iter))
                 {
                     if (_listStore == null) return;
+                    if (_dataStore == null) return;
                     
                     var idStr = (string)_listStore.GetValue(iter, 0);
                     var id = Guid.Parse(idStr);
 
-                    var senha = _dataStore?.GetPassword(id);
+                    var senhaResult = _dataStore.GetPassword(id);
+
+                    if (senhaResult.IsError)
+                    {
+                        GenericDialogs.ShowErrorDialog(this, "Failed to copy password: " + senhaResult.FirstError.Description);
+                        return;
+                    }
+
+                    var senha = senhaResult.Value;
 
                     if (string.IsNullOrEmpty(senha))
                         return;
@@ -237,26 +245,24 @@ public class MainWindow : Window
 
         if (_dataStore == null) return;
         
-        var keyDialog = new InputDialog(this, "Enter the new key:", initial: "", isPassword: true);
-        if (keyDialog.Run() == (int)ResponseType.Ok)
+        var keyResponse = GenericDialogs.ShowInputDialog(this, "Enter the new key:", true);
+        if (keyResponse.Item1)
         {
-            string value = keyDialog.Text;
+            var value = keyResponse.Item2;
             
             _dataStore.ChangeDbPassword(value);
 
             OpenNewDbConnection();
             GetItems();
         }
-
-        keyDialog.Destroy();
     }
 
     private void OnExitItemActivated(object? o, EventArgs eventArgs)
     {
-        var confirm = new MessageDialog(this, DialogFlags.Modal, MessageType.Question, ButtonsType.YesNo, "Are you sure you want to exit?");
-        int resp = confirm.Run();
-        confirm.Destroy();
-        if (resp == (int)ResponseType.Yes) Application.Quit();
+        if (GenericDialogs.ShowConfirmDialog(this, "Are you sure you want to exit?"))
+        {
+            Application.Quit();
+        }
     }
 
     private void OnWindowDestroyed(object? o, EventArgs eventArgs)
@@ -272,18 +278,16 @@ public class MainWindow : Window
 
     private void OnWindowShown(object? sender, EventArgs e)
     {
-        var keyDialog = new InputDialog(this, "Enter the key:", initial: "", isPassword: true);
-        if (keyDialog.Run() == (int)ResponseType.Ok)
+        var keyResponse = GenericDialogs.ShowInputDialog(this, "Enter the key:", true);
+        if (keyResponse.Item1)
         {
-            string value = keyDialog.Text;
+            string value = keyResponse.Item2;
 
             SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
             
             OpenNewDbConnection();
             GetItems();
         }
-
-        keyDialog.Destroy();
     }
 
     private void OpenNewDbConnection()
@@ -301,8 +305,7 @@ public class MainWindow : Window
 
     private void OnFilterEntryActivated(object? o, EventArgs eventArgs)
     {
-        var filterEntry = o as Entry;
-        if (filterEntry == null) return;
+        if (o is not Entry filterEntry) return;
         
         var filter = string.IsNullOrWhiteSpace(filterEntry.Text) ? null : filterEntry.Text;
         GetItems(filter);

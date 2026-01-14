@@ -1,8 +1,10 @@
+using ErrorOr;
 using LiteDB;
 using LiteDB.Engine;
 using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
+using System.Security.Cryptography;
 
 namespace PassKeeper.Gtk.Services;
 
@@ -130,7 +132,7 @@ public class DataStore : IDataStore, IDisposable
         _passwords.Upsert(itemPassword);
     }
 
-    public string GetPassword(Guid id)
+    public ErrorOr<string> GetPassword(Guid id)
     {
         var item = _passwords.FindById(id);
         if (item?.Password is null)
@@ -140,13 +142,17 @@ public class DataStore : IDataStore, IDisposable
         {
             return AesEncryption.Decrypt(item.Password, GetPasswordsKey());
         }
+        catch (CryptographicException)
+        {
+            return Error.Failure(description: "Não foi possível decriptografar a senha armazenada.");
+        }
         catch
         {
-            return string.Empty;
+            return Error.Failure(description: "Falha ao obter senha do item.");
         }
     }
 
-    private object GetDbConfiguration(string key, object? defaultValue = null)
+    public object GetDbConfiguration(string key, object? defaultValue = null)
     {
         var value = _configuration.FindOne(c => c.Key == key);
 

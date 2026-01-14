@@ -202,14 +202,16 @@ public class MainWindow : Window
                     var idStr = (string)_listStore.GetValue(iter, 0);
                     var id = Guid.Parse(idStr);
 
-                    // TODO: não obter em string, mas talvez em char[]
                     var senha = _dataStore?.GetPassword(id);
+
+                    if (string.IsNullOrEmpty(senha))
+                        return;
 
                     var clipboard = Clipboard.Get(Gdk.Selection.Clipboard);
                     clipboard.Text = senha;
 
                     // Clear clipboard after 30 seconds
-                    // TODO: melhorar, não parece estar funcionando corretamente
+                    // TODO: melhorar, não parece estar funcionando corretamente - está adicionado um novo valor no Windows ao invés de limpar o anterior
                     GLib.Timeout.Add(30000, () =>
                     {
                         if (clipboard.WaitForText() == senha)
@@ -242,9 +244,7 @@ public class MainWindow : Window
             
             _dataStore.ChangeDbPassword(value);
 
-            SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
-            
-            OpenNewDbConnection(value);
+            OpenNewDbConnection();
             GetItems();
         }
 
@@ -277,22 +277,22 @@ public class MainWindow : Window
         {
             string value = keyDialog.Text;
 
-            OpenNewDbConnection(value);
+            SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
+            
+            OpenNewDbConnection();
             GetItems();
         }
 
         keyDialog.Destroy();
     }
 
-    private void OpenNewDbConnection(string password)
+    private void OpenNewDbConnection()
     {
         if (_dataStore != null)
         {
             _dataStore.Dispose();
             _dataStore = null;
         }
-
-        SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, password.ToCharArray());
 
         _dataStore = new DataStore(SecretStore);
 

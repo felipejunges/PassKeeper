@@ -11,6 +11,7 @@ public class DataStore : IDataStore, IDisposable
     private readonly LiteDatabase _db;
     private readonly ILiteCollection<Item> _itens;
     private readonly ILiteCollection<ItemPassword> _passwords;
+    private readonly ILiteCollection<AppConfiguration> _configuration;
     private bool _disposed;
     
     public string FullDbPath { get; }
@@ -26,8 +27,7 @@ public class DataStore : IDataStore, IDisposable
         if (string.IsNullOrWhiteSpace(password))
             throw new ArgumentException("A non-empty password is required to encrypt the database.", nameof(password));
 
-        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "GtkSharpApp", "items.db");
+        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GtkSharpApp", "items.db");
         var dir = Path.GetDirectoryName(path) ?? ".";
         Directory.CreateDirectory(dir);
 
@@ -43,23 +43,13 @@ public class DataStore : IDataStore, IDisposable
         
         _itens = _db.GetCollection<Item>("items");
         _passwords = _db.GetCollection<ItemPassword>("passwords");
+        _configuration = _db.GetCollection<AppConfiguration>("configuration");
         
         _itens.EnsureIndex<string>(x => x.Title);
     }
 
     public void ChangeDbPassword(string newPassword)
     {
-        var currentPassword = _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey);
-
-        // TODO: persistir a senha com uma chave interna (1/3)
-        var senhas = _passwords.FindAll().ToList();
-        senhas.ForEach(s =>
-        {
-            var decryptedPassword = AesEncryption.Decrypt(s.Password, currentPassword);
-            s.Password = AesEncryption.Encrypt(decryptedPassword, newPassword.ToCharArray());
-            _passwords.Update(s);
-        });
-
         try
         {
             _db.Rebuild(new RebuildOptions
@@ -71,6 +61,8 @@ public class DataStore : IDataStore, IDisposable
         {
             if (!ex.Message.Contains("Invalid password"))
                 throw;
+            
+            _secretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, newPassword.ToCharArray());
         }
         finally
         {
@@ -129,12 +121,10 @@ public class DataStore : IDataStore, IDisposable
         if (string.IsNullOrWhiteSpace(itemView.Password))
             return;
 
-        // TODO: transformar AesEncryption em uma interface e receber instância via injeção de dependência para ser testável
-        // TODO: persistir a senha com uma chave interna (2/3)
         var itemPassword = new ItemPassword
         {
             Id = itemView.Id,
-            Password = AesEncryption.Encrypt(itemView.Password, _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey))
+            Password = AesEncryption.Encrypt(itemView.Password, GetPasswordsKey())
         };
 
         _passwords.Upsert(itemPassword);
@@ -146,9 +136,36 @@ public class DataStore : IDataStore, IDisposable
         if (item?.Password is null)
             return string.Empty;
 
-        // TODO: transformar AesEncryption em uma interface e receber instância via injeção de dependência para ser testável
-        // TODO: persistir a senha com uma chave interna (3/3)
-        return AesEncryption.Decrypt(item.Password, _secretStore.GetSecret(SecretStoreConsts.DbPasswordKey));
+        try
+        {
+            return AesEncryption.Decrypt(item.Password, GetPasswordsKey());
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private object GetDbConfiguration(string key, object? defaultValue = null)
+    {
+        var value = _configuration.FindOne(c => c.Key == key);
+
+        if (value is null && defaultValue is not null)
+        {
+            value = new AppConfiguration(key, defaultValue);
+            _configuration.Upsert(value);
+        }
+        
+        return value?.Value ?? throw new KeyNotFoundException($"Configuration key '{key}' not found.");
+    }
+
+    private char[] GetPasswordsKey()
+    {
+        var randomNewKey = Guid.NewGuid().ToByteArray();
+        var bytes = GetDbConfiguration("PasswordsKey", randomNewKey) as byte[];
+        var key = System.Text.Encoding.UTF8.GetChars(bytes!);
+        
+        return key;
     }
 
     private static ItemView MapToItemView(Item item)
@@ -183,7 +200,6 @@ public class DataStore : IDataStore, IDisposable
     {
         if (_disposed) return;
         _db.Dispose();
-        _secretStore.Dispose();
         _disposed = true;
         GC.SuppressFinalize(this);
     }

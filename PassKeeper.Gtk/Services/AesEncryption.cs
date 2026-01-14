@@ -82,6 +82,9 @@ public static class AesEncryption
 
     private static byte[] DeriveKey(char[] password, byte[] salt, int keyBytes)
     {
+        // aqui a senha é convertida para um string, menos seguro que um char[]
+        // TODO: validar nas próximas versões da lib ou se não existe outra forma de derivar a chave 
+        
         var passwordBytes = Encoding.UTF8.GetBytes(password);
         return KeyDerivation.Pbkdf2(
             password: Encoding.UTF8.GetString(passwordBytes),

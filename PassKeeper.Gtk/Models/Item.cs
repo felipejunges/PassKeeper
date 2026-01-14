@@ -1,3 +1,5 @@
+using PassKeeper.Gtk.Extensions;
+
 namespace PassKeeper.Gtk.Models;
 
 public class Item
@@ -7,6 +9,7 @@ public class Item
     public string? Username { get; set; }
     public string? Email { get; set; }
     public string? OtherInfo { get; set; }
-    
-    // TODO: store bool HasPassword
+    public DateTime? SoftDeleteIn { get; set; }
+
+    public string? DaysToDelete => SoftDeleteIn.HasValue ? (SoftDeleteIn.Value - DateTime.Now).ToDiasHoras() : null;
 }

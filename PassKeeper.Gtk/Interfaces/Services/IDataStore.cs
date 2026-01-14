@@ -7,11 +7,12 @@ public interface IDataStore
 {
     void ChangeDbPassword(string newPassword);
     IEnumerable<ItemView> GetAll();
-    IEnumerable<ItemView> Get(string? filter);
+    IEnumerable<ItemView> Get(string? filter, bool filterDeleted);
     ItemView? GetById(Guid id);
     Guid Add(ItemView itemView);
     void Update(ItemView itemView);
-    void Delete(Guid id);
+    void SoftDelete(Guid id);
+    void HardDeleteOlds();
     long Count();
     object GetDbConfiguration(string key, object? defaultValue = null);
     ErrorOr<string> GetPassword(Guid id);

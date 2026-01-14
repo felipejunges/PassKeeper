@@ -16,6 +16,8 @@ public class MainWindow : Window
 
     private readonly string _defaultTitle;
     private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
+
+    private bool _filterDeletedItems;
     
     public MainWindow(string title) : base(title)
     {
@@ -54,6 +56,7 @@ public class MainWindow : Window
         _treeView.AppendColumn("Title", new CellRendererText(), "text", 1);
         _treeView.AppendColumn("Username", new CellRendererText(), "text", 2);
         _treeView.AppendColumn("Email", new CellRendererText(), "text", 3);
+        _treeView.AppendColumn("DEL?", new CellRendererText(), "text", 4);
 
         // I.A. sugeriu por conta do problema de não interceptar clique direito
         _treeView.AddEvents((int)Gdk.EventMask.ButtonPressMask);
@@ -84,6 +87,7 @@ public class MainWindow : Window
     private MenuBar CreateWindowMenuBar()
     {
         var menuBar = new MenuBar();
+
         var fileMenuItem = new MenuItem("File");
         var fileMenu = new Menu();
         var changeDbPasswordItem = new MenuItem("Change DB password");
@@ -94,10 +98,23 @@ public class MainWindow : Window
         fileMenu.Append(exitItem);
         fileMenuItem.Submenu = fileMenu;
         menuBar.Append(fileMenuItem);
-        
+
+        var optionsMenuItem = new MenuItem("Options");
+        var optionsMenu = new Menu();
+        var filterDeletedItemsItem = new CheckMenuItem("Filter deleted items");
+
+        optionsMenu.Append(filterDeletedItemsItem);
+        optionsMenuItem.Submenu = optionsMenu;
+        menuBar.Append(optionsMenuItem);
+
         changeDbPasswordItem.Activated += OnChangeDbPasswordActivated;
         exitItem.Activated += OnExitItemActivated;
-        
+        filterDeletedItemsItem.Activated += (_, _) =>
+        {
+            _filterDeletedItems = filterDeletedItemsItem.Active;
+            GetItems();
+        };
+
         return menuBar;
     }
 
@@ -118,7 +135,10 @@ public class MainWindow : Window
                 var item = dialog.UpdateItem();
 
                 _dataStore?.Add(item);
-                _listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email);
+                //_listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email, item.DaysToDelete);
+                
+                GetItems();
+                SelectItemOnTreeView(item.Id.ToString());
             }
 
             dialog.Destroy();
@@ -155,7 +175,9 @@ public class MainWindow : Window
                     dialog.UpdateItem();
 
                     _dataStore?.Update(item);
-                    _listStore.SetValues(iter, item.Id.ToString(), item.Title, item.Username, item.Email);
+                    
+                    GetItems();
+                    SelectItemOnTreeView(idStr);
                 }
 
                 dialog.Destroy();
@@ -171,15 +193,15 @@ public class MainWindow : Window
         
         if (_treeView.Selection.GetSelected(out TreeIter iter))
         {
-            var confirm = new MessageDialog(this, DialogFlags.Modal, MessageType.Question, ButtonsType.YesNo, "Are you sure you want to delete the item?");
-            int resp = confirm.Run();
-            confirm.Destroy();
-            if (resp != (int)ResponseType.Yes) return;
-
+            var confirmacao = GenericDialogs.ShowConfirmDialog(this, "Are you sure you want to delete the item?");
+            if (!confirmacao) return;
+            
             var idStr = (string)_listStore.GetValue(iter, 0);
             var id = Guid.Parse(idStr);
-            _dataStore?.Delete(id);
-            _listStore.Remove(ref iter);
+            _dataStore?.SoftDelete(id);
+            
+            GetItems();
+            SelectItemOnTreeView(idStr);
         }
     }
 
@@ -286,6 +308,7 @@ public class MainWindow : Window
             SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
             
             OpenNewDbConnection();
+            
             GetItems();
         }
     }
@@ -311,17 +334,34 @@ public class MainWindow : Window
         GetItems(filter);
     }
 
-    private static void GetItems(string? filter = null)
+    private void GetItems(string? filter = null)
     {
-        _listStore?.Clear();
-
         if (_dataStore is null) return;
         
-        var itens = _dataStore.Get(filter);
+        _dataStore.HardDeleteOlds();
+        var itens = _dataStore.Get(filter, _filterDeletedItems);
 
+        _listStore?.Clear();
         foreach (var item in itens)
         {
-            _listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email);
+            _listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email, item.DaysToDelete);
+        }
+    }
+    
+    private static void SelectItemOnTreeView(string id)
+    {
+        if (_listStore == null || _treeView == null) return;
+        
+        if (_listStore.GetIterFirst(out TreeIter it))
+        {
+            do
+            {
+                if ((string)_listStore.GetValue(it, 0) == id)
+                {
+                    _treeView.Selection.SelectIter(it);
+                    break;
+                }
+            } while (_listStore.IterNext(ref it));
         }
     }
 }

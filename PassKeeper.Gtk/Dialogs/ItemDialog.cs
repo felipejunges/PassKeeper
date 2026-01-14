@@ -55,7 +55,7 @@ public class ItemDialog : Dialog
         {
             Item = new ItemView()
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 Title = _titleEntry.Text,
                 Username = _usernameEntry.Text,
                 Email = _emailEntry.Text,

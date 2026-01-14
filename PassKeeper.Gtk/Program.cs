@@ -1,4 +1,5 @@
 ﻿using Gtk;
+using PassKeeper.Gtk.Extensions;
 using System.Reflection;
 
 namespace PassKeeper.Gtk;
@@ -20,7 +21,7 @@ static class Program
     private static string GetAppVersion()
     {
         var entry = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var version = entry.GetName().Version?.ToString();
+        var version = entry.GetName().Version?.ToFormatedString();
         return version ?? string.Empty;
     }
 }

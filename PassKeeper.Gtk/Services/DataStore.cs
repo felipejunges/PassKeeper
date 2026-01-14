@@ -15,6 +15,8 @@ public class DataStore : IDataStore, IDisposable
     private readonly ILiteCollection<ItemPassword> _passwords;
     private readonly ILiteCollection<AppConfiguration> _configuration;
     private bool _disposed;
+
+    private const int DiasHardDelete = 30;
     
     public string FullDbPath { get; }
 
@@ -74,11 +76,11 @@ public class DataStore : IDataStore, IDisposable
 
     public IEnumerable<ItemView> GetAll() => _itens.FindAll().Select(MapToItemView);
 
-    public IEnumerable<ItemView> Get(string? filter)
+    public IEnumerable<ItemView> Get(string? filter, bool filterDeleted)
     {
-        var itens = string.IsNullOrWhiteSpace(filter)
-            ? _itens.FindAll()
-            : _itens.Find(i => i.Title.Contains(filter));
+        var itens = _itens.Find(i => 
+            (string.IsNullOrEmpty(filter) || i.Title.Contains(filter))
+            && (filterDeleted || i.DaysToDelete == null));
 
         return itens.Select(MapToItemView);
     }
@@ -110,10 +112,28 @@ public class DataStore : IDataStore, IDisposable
         SavePassword(itemView);
     }
 
-    public void Delete(Guid id)
+    public void SoftDelete(Guid id)
     {
-        _itens.Delete(id);
-        _passwords.Delete(id);
+        var item = _itens.FindById(id);
+
+        if (item is null) return;
+
+        item.SoftDeleteIn = DateTime.Now.AddDays(DiasHardDelete);
+
+        _itens.Update(item);
+    }
+
+    public void HardDeleteOlds()
+    {
+        var itens = _itens.Find(i => 
+            i.SoftDeleteIn != null
+            && i.SoftDeleteIn < DateTime.Now);
+
+        foreach (var item in itens)
+        {
+            _itens.Delete(item.Id);
+            _passwords.Delete(item.Id);
+        }
     }
 
     public long Count() => _itens.LongCount();
@@ -182,7 +202,8 @@ public class DataStore : IDataStore, IDisposable
             Title = item.Title,
             Username = item.Username,
             Email = item.Email,
-            OtherInfo = item.OtherInfo
+            OtherInfo = item.OtherInfo,
+            DaysToDelete = item.DaysToDelete
         };
 
         return itemView;

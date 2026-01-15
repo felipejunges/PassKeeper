@@ -16,7 +16,7 @@ public class DataStore : IDataStore, IDisposable
     private readonly ILiteCollection<AppConfiguration> _configuration;
     private bool _disposed;
 
-    private const int DiasHardDelete = 30;
+    public static TimeSpan TimeToHardDelete = TimeSpan.FromDays(30);
     
     public string FullDbPath { get; }
 
@@ -83,7 +83,7 @@ public class DataStore : IDataStore, IDisposable
                 string.IsNullOrEmpty(filter)
                 || i.Title.Contains(filter)
                 || (i.Group != null && i.Group.Contains(filter)))
-            && (filterDeleted || i.DaysToDelete == null));
+            && (filterDeleted || i.SoftDeletedIn == null));
 
         return itens.Select(MapToItemView);
     }
@@ -121,16 +121,21 @@ public class DataStore : IDataStore, IDisposable
 
         if (item is null) return;
 
-        item.SoftDeleteIn = DateTime.Now.AddDays(DiasHardDelete);
+        if (item.SoftDeletedIn.HasValue)
+            item.SoftDeletedIn = null;
+        else
+            item.SoftDeletedIn = DateTime.Now;
 
         _itens.Update(item);
     }
 
     public void HardDeleteOlds()
     {
+        var dataLimite = DateTime.Now.Subtract(TimeToHardDelete);
+        
         var itens = _itens.Find(i => 
-            i.SoftDeleteIn != null
-            && i.SoftDeleteIn < DateTime.Now);
+            i.SoftDeletedIn != null
+            && i.SoftDeletedIn < dataLimite);
 
         foreach (var item in itens)
         {
@@ -207,7 +212,7 @@ public class DataStore : IDataStore, IDisposable
             Username = item.Username,
             Email = item.Email,
             OtherInfo = item.OtherInfo,
-            DaysToDelete = item.DaysToDelete
+            SoftDeletedIn = item.SoftDeletedIn
         };
 
         return itemView;
@@ -223,6 +228,7 @@ public class DataStore : IDataStore, IDisposable
             Username = itemView.Username,
             Email = itemView.Email,
             OtherInfo = itemView.OtherInfo,
+            SoftDeletedIn = itemView.SoftDeletedIn
         };
 
         return item;

@@ -1,6 +1,7 @@
 using Gtk;
 using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Dialogs;
+using PassKeeper.Gtk.Extensions;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Services;
 
@@ -351,13 +352,17 @@ public class MainWindow : Window
         _listStore?.Clear();
         foreach (var item in itens)
         {
+            var daysToHardDelete = item.SoftDeletedIn.HasValue
+                ? (item.SoftDeletedIn.Value.Add(DataStore.TimeToHardDelete) - DateTime.Now).ToDiasHoras()
+                : null;
+            
             _listStore?.AppendValues(
                 item.Id.ToString(),
                 item.Group,
                 item.Title,
                 item.Username,
                 item.Email,
-                item.DaysToDelete);
+                daysToHardDelete);
         }
     }
     

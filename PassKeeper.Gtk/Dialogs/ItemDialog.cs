@@ -40,7 +40,7 @@ public class ItemDialog : Dialog
         if (item != null)
         {
             _titleEntry.Text = item.Title;
-            _groupEntry.Text = item.Group;
+            _groupEntry.Text = item.Group ?? string.Empty;
             _usernameEntry.Text = item.Username ?? string.Empty;
             _emailEntry.Text = item.Email ?? string.Empty;
             _passwordEntry.Text = item.Password ?? string.Empty;

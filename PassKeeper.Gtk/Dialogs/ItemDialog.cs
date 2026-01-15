@@ -8,6 +8,7 @@ public class ItemDialog : Dialog
     private ItemView? Item { get; set; }
 
     private readonly Entry _titleEntry = new Entry();
+    private readonly Entry _groupEntry = new Entry();
     private readonly Entry _usernameEntry = new Entry();
     private readonly Entry _emailEntry = new Entry();
     private readonly Entry _passwordEntry = new Entry();
@@ -23,6 +24,8 @@ public class ItemDialog : Dialog
         content.Margin = 8;
         content.PackStart(new Label("Title:"), false, false, 2);
         content.PackStart(_titleEntry, false, false, 2);
+        content.PackStart(new Label("Group:"), false, false, 2);
+        content.PackStart(_groupEntry, false, false, 2);
         content.PackStart(new Label("Username:"), false, false, 2);
         content.PackStart(_usernameEntry, false, false, 2);
         content.PackStart(new Label("Email:"), false, false, 2);
@@ -37,6 +40,7 @@ public class ItemDialog : Dialog
         if (item != null)
         {
             _titleEntry.Text = item.Title;
+            _groupEntry.Text = item.Group;
             _usernameEntry.Text = item.Username ?? string.Empty;
             _emailEntry.Text = item.Email ?? string.Empty;
             _passwordEntry.Text = item.Password ?? string.Empty;
@@ -57,6 +61,7 @@ public class ItemDialog : Dialog
             {
                 Id = Guid.CreateVersion7(),
                 Title = _titleEntry.Text,
+                Group = _groupEntry.Text,
                 Username = _usernameEntry.Text,
                 Email = _emailEntry.Text,
                 Password = _passwordEntry.Text,
@@ -67,6 +72,7 @@ public class ItemDialog : Dialog
         }
 
         Item.Title = _titleEntry.Text;
+        Item.Group = _groupEntry.Text;
         Item.Username = _usernameEntry.Text;
         Item.Email = _emailEntry.Text;
         Item.Password = _passwordEntry.Text;
@@ -79,9 +85,7 @@ public class ItemDialog : Dialog
     {
         if (string.IsNullOrWhiteSpace(_titleEntry.Text))
         {
-            var msg = new MessageDialog(this, DialogFlags.Modal, MessageType.Error, ButtonsType.Ok, "Title is required.");
-            msg.Run();
-            msg.Destroy();
+            GenericDialogs.ShowErrorDialog(this, "Title is required.");
             
             return false;
         }

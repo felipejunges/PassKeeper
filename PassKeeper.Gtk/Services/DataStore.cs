@@ -79,7 +79,10 @@ public class DataStore : IDataStore, IDisposable
     public IEnumerable<ItemView> Get(string? filter, bool filterDeleted)
     {
         var itens = _itens.Find(i => 
-            (string.IsNullOrEmpty(filter) || i.Title.Contains(filter))
+            (
+                string.IsNullOrEmpty(filter)
+                || i.Title.Contains(filter)
+                || (i.Group != null && i.Group.Contains(filter)))
             && (filterDeleted || i.DaysToDelete == null));
 
         return itens.Select(MapToItemView);
@@ -200,6 +203,7 @@ public class DataStore : IDataStore, IDisposable
         {
             Id = item.Id,
             Title = item.Title,
+            Group = item.Group,
             Username = item.Username,
             Email = item.Email,
             OtherInfo = item.OtherInfo,
@@ -215,6 +219,7 @@ public class DataStore : IDataStore, IDisposable
         {
             Id = itemView.Id,
             Title = itemView.Title,
+            Group = itemView.Group,
             Username = itemView.Username,
             Email = itemView.Email,
             OtherInfo = itemView.OtherInfo,

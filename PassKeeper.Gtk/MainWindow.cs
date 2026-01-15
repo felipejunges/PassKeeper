@@ -23,7 +23,7 @@ public class MainWindow : Window
     {
         _defaultTitle = title;
         
-        SetDefaultSize(700, 400);
+        SetDefaultSize(1200, 600);
         SetPosition(WindowPosition.Center);
 
         DeleteEvent += OnWindowDeleteEvent;
@@ -50,13 +50,14 @@ public class MainWindow : Window
 
         // TreeView setup
         _treeView = new TreeView();
-        _listStore = new ListStore(typeof(string), typeof(string), typeof(string), typeof(string), typeof(string));
+        _listStore = new ListStore(typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string));
         _treeView.Model = _listStore;
-        _treeView.AppendColumn("ID", new CellRendererText(), "text", 0);
-        _treeView.AppendColumn("Title", new CellRendererText(), "text", 1);
-        _treeView.AppendColumn("Username", new CellRendererText(), "text", 2);
-        _treeView.AppendColumn("Email", new CellRendererText(), "text", 3);
-        _treeView.AppendColumn("DEL?", new CellRendererText(), "text", 4);
+        _treeView.AppendColumn(NewTextColumn("ID", 0));
+        _treeView.AppendColumn(NewTextColumn("Group", 1));
+        _treeView.AppendColumn(NewTextColumn("Title", 2));
+        _treeView.AppendColumn(NewTextColumn("Username", 3));
+        _treeView.AppendColumn(NewTextColumn("Email", 4));
+        _treeView.AppendColumn(NewTextColumn("DEL?", 5));
 
         // I.A. sugeriu por conta do problema de não interceptar clique direito
         _treeView.AddEvents((int)Gdk.EventMask.ButtonPressMask);
@@ -82,6 +83,13 @@ public class MainWindow : Window
         addButton.Clicked += OnAddButtonClicked;
         editButton.Clicked += OnEditButtonClicked;
         deleteButton.Clicked += OnDeleteButtonClicked;
+    }
+
+    private static TreeViewColumn NewTextColumn(string title, int index)
+    {
+        var column = new TreeViewColumn(title, new CellRendererText(), "text", index);
+        column.Resizable = true;
+        return column;
     }
 
     private MenuBar CreateWindowMenuBar()
@@ -135,7 +143,6 @@ public class MainWindow : Window
                 var item = dialog.UpdateItem();
 
                 _dataStore?.Add(item);
-                //_listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email, item.DaysToDelete);
                 
                 GetItems();
                 SelectItemOnTreeView(item.Id.ToString());
@@ -344,7 +351,13 @@ public class MainWindow : Window
         _listStore?.Clear();
         foreach (var item in itens)
         {
-            _listStore?.AppendValues(item.Id.ToString(), item.Title, item.Username, item.Email, item.DaysToDelete);
+            _listStore?.AppendValues(
+                item.Id.ToString(),
+                item.Group,
+                item.Title,
+                item.Username,
+                item.Email,
+                item.DaysToDelete);
         }
     }
     

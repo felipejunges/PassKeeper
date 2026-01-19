@@ -1,6 +1,5 @@
 using LiteDB;
 using LiteDB.Engine;
-using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
 
@@ -17,14 +16,8 @@ public class DataStore : IDataStore, IDisposable
     
     public string FullDbPath { get; }
 
-    private readonly ISecretStore _secretStore;
-
-    public DataStore(ISecretStore secretStore)
+    public DataStore(string? password)
     {
-        _secretStore = secretStore;
-
-        var password = new string(_secretStore.GetSecret(SecretStoreConsts.DbPasswordKey));
-
         if (string.IsNullOrWhiteSpace(password))
             throw new ArgumentException("A non-empty password is required to encrypt the database.", nameof(password));
 
@@ -61,8 +54,6 @@ public class DataStore : IDataStore, IDisposable
         {
             if (!ex.Message.Contains("Invalid password"))
                 throw;
-            
-            _secretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, newPassword.ToCharArray());
         }
         finally
         {

@@ -1,5 +1,4 @@
 using Gtk;
-using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Dialogs;
 using PassKeeper.Gtk.Extensions;
 using PassKeeper.Gtk.Interfaces.Services;
@@ -9,8 +8,6 @@ namespace PassKeeper.Gtk;
 
 public class MainWindow : Window
 {
-    private static readonly ISecretStore SecretStore = new SecretStore("PassKeeper.Gtk.Db");
-    
     private static TreeView? _treeView;
     private static ListStore? _listStore;
     private static IDataStore? _dataStore;
@@ -18,7 +15,7 @@ public class MainWindow : Window
     private readonly string _defaultTitle;
     private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
 
-    private string? _textFilter = null;
+    private string? _textFilter;
     private bool _filterDeletedItems;
     
     public MainWindow(string title) : base(title)
@@ -266,6 +263,8 @@ public class MainWindow : Window
     private void OnChangeDbPasswordActivated(object? sender, EventArgs e)
     {
         // TODO: ask the current password and validate it before changing to a new one
+        
+        // TODO: ask to confirm the new password
 
         if (_dataStore == null) return;
         
@@ -276,7 +275,7 @@ public class MainWindow : Window
             
             _dataStore.ChangeDbPassword(value);
 
-            OpenNewDbConnection();
+            OpenNewDbConnection(value);
             GetItems();
         }
     }
@@ -292,7 +291,6 @@ public class MainWindow : Window
     private void OnWindowDestroyed(object? o, EventArgs eventArgs)
     {
         _dataStore?.Dispose();
-        SecretStore.Dispose();
     }
 
     private static void OnWindowDeleteEvent(object o, DeleteEventArgs args)
@@ -307,15 +305,13 @@ public class MainWindow : Window
         {
             string value = keyResponse.Item2;
 
-            SecretStore.SaveSecret(SecretStoreConsts.DbPasswordKey, value.ToCharArray());
-            
-            OpenNewDbConnection();
+            OpenNewDbConnection(value);
             
             GetItems();
         }
     }
 
-    private void OpenNewDbConnection()
+    private void OpenNewDbConnection(string? password)
     {
         if (_dataStore != null)
         {
@@ -323,7 +319,7 @@ public class MainWindow : Window
             _dataStore = null;
         }
 
-        _dataStore = new DataStore(SecretStore);
+        _dataStore = new DataStore(password);
 
         SetDbConnectionTitle(_dataStore.FullDbPath);
     }

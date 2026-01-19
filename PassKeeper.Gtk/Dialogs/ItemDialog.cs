@@ -12,6 +12,7 @@ public class ItemDialog : Dialog
     private readonly Entry _usernameEntry = new Entry();
     private readonly Entry _emailEntry = new Entry();
     private readonly Entry _passwordEntry = new Entry();
+    private readonly Button _togglePasswordButton = new Button();
     private readonly Entry _otherInfoEntry = new Entry();
 
     public ItemDialog(Window parent, string title, ItemView? item = null) : base(title, parent, DialogFlags.Modal)
@@ -31,11 +32,25 @@ public class ItemDialog : Dialog
         content.PackStart(new Label("Email:"), false, false, 2);
         content.PackStart(_emailEntry, false, false, 2);
         content.PackStart(new Label("Password:"), false, false, 2);
-        content.PackStart(_passwordEntry, false, false, 2);
+
+        // Create a horizontal box for password entry and toggle button
+        var passwordBox = new Box(Orientation.Horizontal, 2);
+        passwordBox.PackStart(_passwordEntry, true, true, 0);
+        
+        _passwordEntry.Visibility = false;
+        _togglePasswordButton.Label = "👁";
+        _togglePasswordButton.TooltipText = "Show/Hide Password";
+        _togglePasswordButton.WidthRequest = 32;
+        _togglePasswordButton.Clicked += (_, _) =>
+        {
+            _passwordEntry.Visibility = !_passwordEntry.Visibility;
+            _togglePasswordButton.Label = _passwordEntry.Visibility ? "🙈" : "👁";
+        };
+        passwordBox.PackStart(_togglePasswordButton, false, false, 0);
+        
+        content.PackStart(passwordBox, false, false, 2);
         content.PackStart(new Label("Other info:"), false, false, 2);
         content.PackStart(_otherInfoEntry, false, false, 2);
-
-        _passwordEntry.Visibility = false;
 
         if (item != null)
         {

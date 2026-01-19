@@ -70,8 +70,6 @@ public class DataStore : IDataStore, IDisposable
         }
     }
 
-    public IEnumerable<ItemView> GetAll() => _itens.FindAll().Select(MapToItemView);
-
     public IEnumerable<ItemView> Get(string? filter, bool filterDeleted)
     {
         var itens = _itens.Find(i => 
@@ -88,7 +86,7 @@ public class DataStore : IDataStore, IDisposable
     {
         var item = _itens.FindById(id);
 
-        return item == null ? null : MapToItemView(item);
+        return item == null ? null : MapToItemViewWithPassword(item);
     }
 
     public Guid Add(ItemView itemView)
@@ -137,26 +135,6 @@ public class DataStore : IDataStore, IDisposable
 
     public long Count() => _itens.LongCount();
 
-    // public ErrorOr<string> GetPassword(Guid id)
-    // {
-    //     var item = _passwords.FindById(id);
-    //     if (item?.Password is null)
-    //         return string.Empty;
-    //
-    //     try
-    //     {
-    //         return AesEncryption.Decrypt(item.Password, GetPasswordsKey());
-    //     }
-    //     catch (CryptographicException)
-    //     {
-    //         return Error.Failure(description: "Não foi possível decriptografar a senha armazenada.");
-    //     }
-    //     catch
-    //     {
-    //         return Error.Failure(description: "Falha ao obter senha do item.");
-    //     }
-    // }
-
     public object GetDbConfiguration(string key, object? defaultValue = null)
     {
         var value = _configuration.FindOne(c => c.Key == key);
@@ -179,7 +157,11 @@ public class DataStore : IDataStore, IDisposable
         return key;
     }
 
-    private ItemView MapToItemView(Item item)
+    private ItemView MapToItemView(Item item) => MapToItemView(item, false);
+    
+    private ItemView MapToItemViewWithPassword(Item item) => MapToItemView(item, true);
+    
+    private ItemView MapToItemView(Item item, bool decryptPass)
     {
         var itemView = new ItemView
         {
@@ -189,7 +171,7 @@ public class DataStore : IDataStore, IDisposable
             Username = item.Username,
             Email = item.Email,
             OtherInfo = item.OtherInfo,
-            Password = item.Password == null ? null : AesEncryption.Decrypt(item.Password, GetPasswordsKey()),
+            Password = !decryptPass || item.Password == null ? null : AesEncryption.Decrypt(item.Password, GetPasswordsKey()),
             SoftDeletedIn = item.SoftDeletedIn
         };
 

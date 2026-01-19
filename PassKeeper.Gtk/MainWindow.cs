@@ -18,6 +18,7 @@ public class MainWindow : Window
     private readonly string _defaultTitle;
     private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
 
+    private string? _textFilter = null;
     private bool _filterDeletedItems;
     
     public MainWindow(string title) : base(title)
@@ -331,16 +332,17 @@ public class MainWindow : Window
     {
         if (o is not Entry filterEntry) return;
         
-        var filter = string.IsNullOrWhiteSpace(filterEntry.Text) ? null : filterEntry.Text;
-        GetItems(filter);
+        _textFilter = string.IsNullOrWhiteSpace(filterEntry.Text) ? null : filterEntry.Text;
+        
+        GetItems();
     }
 
-    private void GetItems(string? filter = null)
+    private void GetItems()
     {
         if (_dataStore is null) return;
         
         _dataStore.HardDeleteOlds();
-        var itens = _dataStore.Get(filter, _filterDeletedItems);
+        var itens = _dataStore.Get(_textFilter, _filterDeletedItems);
 
         _listStore?.Clear();
         foreach (var item in itens)

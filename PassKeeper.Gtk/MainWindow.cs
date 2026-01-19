@@ -8,9 +8,9 @@ namespace PassKeeper.Gtk;
 
 public class MainWindow : Window
 {
-    private static TreeView? _treeView;
-    private static ListStore? _listStore;
-    private static IDataStore? _dataStore;
+    private TreeView? _treeView;
+    private ListStore? _listStore;
+    private IDataStore? _dataStore;
 
     private readonly string _defaultTitle;
     private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
@@ -113,7 +113,7 @@ public class MainWindow : Window
         optionsMenu.Append(filterDeletedItemsItem);
         optionsMenuItem.Submenu = optionsMenu;
         menuBar.Append(optionsMenuItem);
-
+        
         changeDbPasswordItem.Activated += OnChangeDbPasswordActivated;
         exitItem.Activated += OnExitItemActivated;
         filterDeletedItemsItem.Activated += (_, _) =>
@@ -147,7 +147,7 @@ public class MainWindow : Window
                 SelectItemOnTreeView(item.Id.ToString());
             }
 
-            dialog.Destroy();
+            dialog.Dispose();
         };
         
         dialog.ShowAll();
@@ -186,7 +186,7 @@ public class MainWindow : Window
                     SelectItemOnTreeView(idStr);
                 }
 
-                dialog.Destroy();
+                dialog.Dispose();
             };
                 
             dialog.ShowAll();
@@ -266,7 +266,7 @@ public class MainWindow : Window
         
         // TODO: ask to confirm the new password
 
-        if (_dataStore == null) return;
+        if (_dataStore is null) return;
         
         var keyResponse = GenericDialogs.ShowInputDialog(this, "Enter the new key:", true);
         if (keyResponse.Item1)
@@ -290,6 +290,8 @@ public class MainWindow : Window
 
     private void OnWindowDestroyed(object? o, EventArgs eventArgs)
     {
+        _treeView?.Dispose();
+        _listStore?.Dispose();
         _dataStore?.Dispose();
     }
 
@@ -335,19 +337,19 @@ public class MainWindow : Window
 
     private void GetItems()
     {
-        if (_dataStore is null) return;
+        if (_dataStore is null || _listStore is null) return;
         
         _dataStore.HardDeleteOlds();
         var itens = _dataStore.Get(_textFilter, _filterDeletedItems);
 
-        _listStore?.Clear();
+        _listStore.Clear();
         foreach (var item in itens)
         {
             var daysToHardDelete = item.SoftDeletedIn.HasValue
                 ? (item.SoftDeletedIn.Value.Add(DataStore.TimeToHardDelete) - DateTime.Now).ToDiasHoras()
                 : null;
             
-            _listStore?.AppendValues(
+            _listStore.AppendValues(
                 item.Id.ToString(),
                 item.Group,
                 item.Title,
@@ -357,9 +359,9 @@ public class MainWindow : Window
         }
     }
     
-    private static void SelectItemOnTreeView(string id)
+    private void SelectItemOnTreeView(string id)
     {
-        if (_listStore == null || _treeView == null) return;
+        if (_listStore is null || _treeView is null) return;
         
         if (_listStore.GetIterFirst(out TreeIter it))
         {

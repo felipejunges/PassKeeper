@@ -15,7 +15,6 @@ public interface IDataStore
     void HardDeleteOlds();
     long Count();
     object GetDbConfiguration(string key, object? defaultValue = null);
-    ErrorOr<string> GetPassword(Guid id);
     void Dispose();
     string FullDbPath { get; }
 }

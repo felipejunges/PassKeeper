@@ -9,7 +9,7 @@ namespace PassKeeper.Gtk;
 
 public class MainWindow : Window
 {
-    private static readonly ISecretStore SecretStore = new SecretStore("PassKeeper.Gtk");
+    private static readonly ISecretStore SecretStore = new SecretStore("PassKeeper.Gtk.Db");
     
     private static TreeView? _treeView;
     private static ListStore? _listStore;
@@ -232,27 +232,20 @@ public class MainWindow : Window
                     var idStr = (string)_listStore.GetValue(iter, 0);
                     var id = Guid.Parse(idStr);
 
-                    var senhaResult = _dataStore.GetPassword(id);
-
-                    if (senhaResult.IsError)
-                    {
-                        GenericDialogs.ShowErrorDialog(this, "Failed to copy password: " + senhaResult.FirstError.Description);
-                        return;
-                    }
-
-                    var senha = senhaResult.Value;
-
-                    if (string.IsNullOrEmpty(senha))
+                    var item = _dataStore.GetById(id);
+                    if (item == null) return;
+                    
+                    if (string.IsNullOrEmpty(item.Password))
                         return;
 
                     var clipboard = Clipboard.Get(Gdk.Selection.Clipboard);
-                    clipboard.Text = senha;
+                    clipboard.Text = item.Password;
 
                     // Clear clipboard after 30 seconds
                     // TODO: melhorar, não parece estar funcionando corretamente - está adicionado um novo valor no Windows ao invés de limpar o anterior
                     GLib.Timeout.Add(30000, () =>
                     {
-                        if (clipboard.WaitForText() == senha)
+                        if (clipboard.WaitForText() == item.Password)
                         {
                             clipboard.Text = string.Empty;
                         }

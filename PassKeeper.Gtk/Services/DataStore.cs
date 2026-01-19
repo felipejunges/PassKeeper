@@ -1,10 +1,8 @@
-using ErrorOr;
 using LiteDB;
 using LiteDB.Engine;
 using PassKeeper.Gtk.Constants;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
-using System.Security.Cryptography;
 
 namespace PassKeeper.Gtk.Services;
 
@@ -12,7 +10,6 @@ public class DataStore : IDataStore, IDisposable
 {
     private readonly LiteDatabase _db;
     private readonly ILiteCollection<Item> _itens;
-    private readonly ILiteCollection<ItemPassword> _passwords;
     private readonly ILiteCollection<AppConfiguration> _configuration;
     private bool _disposed;
 
@@ -46,7 +43,6 @@ public class DataStore : IDataStore, IDisposable
         _db = new LiteDatabase(conn);
         
         _itens = _db.GetCollection<Item>("items");
-        _passwords = _db.GetCollection<ItemPassword>("passwords");
         _configuration = _db.GetCollection<AppConfiguration>("configuration");
         
         _itens.EnsureIndex<string>(x => x.Title);
@@ -101,8 +97,6 @@ public class DataStore : IDataStore, IDisposable
 
         _itens.Insert(item);
 
-        SavePassword(itemView);
-
         return item.Id;
     }
 
@@ -111,8 +105,6 @@ public class DataStore : IDataStore, IDisposable
         var item = MapToItem(itemView);
 
         _itens.Update(item);
-
-        SavePassword(itemView);
     }
 
     public void SoftDelete(Guid id)
@@ -140,45 +132,30 @@ public class DataStore : IDataStore, IDisposable
         foreach (var item in itens)
         {
             _itens.Delete(item.Id);
-            _passwords.Delete(item.Id);
         }
     }
 
     public long Count() => _itens.LongCount();
 
-    private void SavePassword(ItemView itemView)
-    {
-        if (string.IsNullOrWhiteSpace(itemView.Password))
-            return;
-
-        var itemPassword = new ItemPassword
-        {
-            Id = itemView.Id,
-            Password = AesEncryption.Encrypt(itemView.Password, GetPasswordsKey())
-        };
-
-        _passwords.Upsert(itemPassword);
-    }
-
-    public ErrorOr<string> GetPassword(Guid id)
-    {
-        var item = _passwords.FindById(id);
-        if (item?.Password is null)
-            return string.Empty;
-
-        try
-        {
-            return AesEncryption.Decrypt(item.Password, GetPasswordsKey());
-        }
-        catch (CryptographicException)
-        {
-            return Error.Failure(description: "Não foi possível decriptografar a senha armazenada.");
-        }
-        catch
-        {
-            return Error.Failure(description: "Falha ao obter senha do item.");
-        }
-    }
+    // public ErrorOr<string> GetPassword(Guid id)
+    // {
+    //     var item = _passwords.FindById(id);
+    //     if (item?.Password is null)
+    //         return string.Empty;
+    //
+    //     try
+    //     {
+    //         return AesEncryption.Decrypt(item.Password, GetPasswordsKey());
+    //     }
+    //     catch (CryptographicException)
+    //     {
+    //         return Error.Failure(description: "Não foi possível decriptografar a senha armazenada.");
+    //     }
+    //     catch
+    //     {
+    //         return Error.Failure(description: "Falha ao obter senha do item.");
+    //     }
+    // }
 
     public object GetDbConfiguration(string key, object? defaultValue = null)
     {
@@ -202,7 +179,7 @@ public class DataStore : IDataStore, IDisposable
         return key;
     }
 
-    private static ItemView MapToItemView(Item item)
+    private ItemView MapToItemView(Item item)
     {
         var itemView = new ItemView
         {
@@ -212,13 +189,14 @@ public class DataStore : IDataStore, IDisposable
             Username = item.Username,
             Email = item.Email,
             OtherInfo = item.OtherInfo,
+            Password = item.Password == null ? null : AesEncryption.Decrypt(item.Password, GetPasswordsKey()),
             SoftDeletedIn = item.SoftDeletedIn
         };
 
         return itemView;
     }
 
-    private static Item MapToItem(ItemView itemView)
+    private Item MapToItem(ItemView itemView)
     {
         var item = new Item
         {
@@ -228,6 +206,7 @@ public class DataStore : IDataStore, IDisposable
             Username = itemView.Username,
             Email = itemView.Email,
             OtherInfo = itemView.OtherInfo,
+            Password = itemView.Password == null ? null : AesEncryption.Encrypt(itemView.Password, GetPasswordsKey()),
             SoftDeletedIn = itemView.SoftDeletedIn
         };
 

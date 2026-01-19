@@ -7,6 +7,7 @@ public class Item
     public string? Group { get; set; }
     public string? Username { get; set; }
     public string? Email { get; set; }
+    public byte[]? Password { get; set; }
     public string? OtherInfo { get; set; }
     public DateTime? SoftDeletedIn { get; set; }
 }

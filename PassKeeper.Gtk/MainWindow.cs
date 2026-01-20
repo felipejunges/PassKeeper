@@ -310,7 +310,7 @@ public class MainWindow : Window
             _dataStore = null;
         }
 
-        _dataStore = new DataStore(password);
+        _dataStore = new DataStore(password, IsDebug);
 
         SetDbConnectionTitle(_dataStore.FullDbPath);
     }
@@ -362,6 +362,18 @@ public class MainWindow : Window
                     break;
                 }
             } while (_listStore.IterNext(ref it));
+        }
+    }
+    
+    private static bool IsDebug
+    {
+        get
+        {
+#if DEBUG
+            return true;
+#else
+        return false;
+#endif
         }
     }
 }

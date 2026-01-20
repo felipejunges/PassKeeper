@@ -16,12 +16,13 @@ public class DataStore : IDataStore, IDisposable
     
     public string FullDbPath { get; }
 
-    public DataStore(string? password)
+    public DataStore(string? password, bool debug)
     {
         if (string.IsNullOrWhiteSpace(password))
             throw new ArgumentException("A non-empty password is required to encrypt the database.", nameof(password));
 
-        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GtkSharpApp", "items.db");
+        var path = CreateDbPath(debug);
+
         var dir = Path.GetDirectoryName(path) ?? ".";
         Directory.CreateDirectory(dir);
 
@@ -39,6 +40,21 @@ public class DataStore : IDataStore, IDisposable
         _configuration = _db.GetCollection<AppConfiguration>("configuration");
         
         _itens.EnsureIndex<string>(x => x.Title);
+    }
+
+    private static string CreateDbPath(bool debug)
+    {
+        var paths = new List<string>
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PassKeeper", 
+            "items.db"
+        };
+        
+        if (debug)
+            paths.Insert(2, "debug");
+        
+        return Path.Combine(paths.ToArray());
     }
 
     public void ChangeDbPassword(string newPassword)

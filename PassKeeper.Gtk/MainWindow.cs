@@ -211,6 +211,8 @@ public class MainWindow : Window
         }
     }
 
+    private readonly IClipboardService _clipboardService = new ClipboardService();
+
     private void OnTreeViewButtonPressEvent(object o, ButtonPressEventArgs args)
     {
         if (o is not TreeView treeView) return;
@@ -224,8 +226,7 @@ public class MainWindow : Window
             {
                 if (treeView.Selection.GetSelected(out TreeIter iter))
                 {
-                    if (_listStore == null) return;
-                    if (_dataStore == null) return;
+                    if (_listStore is null || _dataStore is null) return;
                     
                     var idStr = (string)_listStore.GetValue(iter, 0);
                     var id = Guid.Parse(idStr);
@@ -236,20 +237,8 @@ public class MainWindow : Window
                     if (string.IsNullOrEmpty(item.Password))
                         return;
 
-                    var clipboard = Clipboard.Get(Gdk.Selection.Clipboard);
-                    clipboard.Text = item.Password;
-
-                    // Clear clipboard after 30 seconds
-                    // TODO: melhorar, não parece estar funcionando corretamente - está adicionado um novo valor no Windows ao invés de limpar o anterior
-                    GLib.Timeout.Add(30000, () =>
-                    {
-                        if (clipboard.WaitForText() == item.Password)
-                        {
-                            clipboard.Text = string.Empty;
-                        }
-                        
-                        return false; // Do not repeat
-                    });
+                    // Use the centralized clipboard service
+                    _clipboardService.SetGenericTextTemporary(item.Password, TimeSpan.FromSeconds(30));
                 }
             };
 

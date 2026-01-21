@@ -8,6 +8,9 @@
         <AssemblyVersion>1.0</AssemblyVersion>
         <FileVersion>1.0</FileVersion>
         <ApplicationIcon>app_logo_square_centered.ico</ApplicationIcon>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <!--<RuntimeIdentifier>win-x64</RuntimeIdentifier>-->
     </PropertyGroup>
 
     <ItemGroup>

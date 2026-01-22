@@ -34,12 +34,24 @@ public class DataStore : IDataStore, IDisposable
             Password = password
         };
         
-        _db = new LiteDatabase(conn);
-        
-        _itens = _db.GetCollection<Item>("items");
-        _configuration = _db.GetCollection<AppConfiguration>("configuration");
-        
-        _itens.EnsureIndex<string>(x => x.Title);
+        try
+        {
+            _db = new LiteDatabase(conn);
+            _db.UserVersion = 1;
+            
+            _itens = _db.GetCollection<Item>("items");
+            _configuration = _db.GetCollection<AppConfiguration>("configuration");
+            
+            _itens.EnsureIndex<string>(x => x.Title);
+        }
+        catch (LiteException ex) when (ex.Message.Contains("Invalid password"))
+        {
+            throw new UnauthorizedAccessException("Invalid database password.", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new IOException($"Failed to access database file at '{FullDbPath}'.", ex);
+        }
     }
 
     private static string CreateDbPath(bool debug)

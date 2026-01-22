@@ -1,4 +1,5 @@
 using Gtk;
+using LiteDB;
 using PassKeeper.Gtk.Dialogs;
 using PassKeeper.Gtk.Extensions;
 using PassKeeper.Gtk.Interfaces.Services;
@@ -13,7 +14,6 @@ public class MainWindow : Window
     private IDataStore? _dataStore;
 
     private readonly string _defaultTitle;
-    private void SetDbConnectionTitle(string fileName) => Title = $"{_defaultTitle} - {fileName}";
 
     private string? _textFilter;
     private bool _filterDeletedItems;
@@ -97,9 +97,11 @@ public class MainWindow : Window
 
         var fileMenuItem = new MenuItem("File");
         var fileMenu = new Menu();
+        var openDbConnectionItem = new MenuItem("Open/reopen DB connection");
         var changeDbPasswordItem = new MenuItem("Change DB password");
         var exitItem = new MenuItem("Exit");
 
+        fileMenu.Append(openDbConnectionItem);
         fileMenu.Append(changeDbPasswordItem);
         fileMenu.Append(new SeparatorMenuItem());
         fileMenu.Append(exitItem);
@@ -113,7 +115,8 @@ public class MainWindow : Window
         optionsMenu.Append(filterDeletedItemsItem);
         optionsMenuItem.Submenu = optionsMenu;
         menuBar.Append(optionsMenuItem);
-        
+
+        openDbConnectionItem.Activated += OnOpenDbConnectionActivated; 
         changeDbPasswordItem.Activated += OnChangeDbPasswordActivated;
         exitItem.Activated += OnExitItemActivated;
         filterDeletedItemsItem.Activated += (_, _) =>
@@ -249,6 +252,11 @@ public class MainWindow : Window
         }
     }
     
+    private void OnOpenDbConnectionActivated(object? sender, EventArgs args)
+    {
+        GetKeyAndOpenDbConnection();
+    }
+    
     private void OnChangeDbPasswordActivated(object? sender, EventArgs e)
     {
         // TODO: ask the current password and validate it before changing to a new one
@@ -291,6 +299,11 @@ public class MainWindow : Window
 
     private void OnWindowShown(object? sender, EventArgs e)
     {
+        GetKeyAndOpenDbConnection();
+    }
+
+    private void GetKeyAndOpenDbConnection()
+    {
         var keyResponse = GenericDialogs.ShowInputDialog(this, "Enter the key:", true);
         if (keyResponse.Item1)
         {
@@ -310,9 +323,21 @@ public class MainWindow : Window
             _dataStore = null;
         }
 
-        _dataStore = new DataStore(password, IsDebug);
+        try
+        {
+            _dataStore = new DataStore(password, IsDebug);
+        }
+        catch (Exception ex)
+        {
+            _dataStore?.Dispose();
+            _dataStore = null;
+            
+            GenericDialogs.ShowErrorDialog(this, ex.Message);
+        }
 
-        SetDbConnectionTitle(_dataStore.FullDbPath);
+        Title = _dataStore is not null
+            ? $"{_defaultTitle} - {_dataStore.FullDbPath}"
+            : _defaultTitle;
     }
 
     private void OnFilterEntryActivated(object? o, EventArgs eventArgs)
@@ -326,12 +351,16 @@ public class MainWindow : Window
 
     private void GetItems()
     {
-        if (_dataStore is null || _listStore is null) return;
+        if (_listStore is null) return;
+        
+        _listStore.Clear();
+        
+        if (_dataStore is null) return;
         
         _dataStore.HardDeleteOlds();
-        var itens = _dataStore.Get(_textFilter, _filterDeletedItems);
 
-        _listStore.Clear();
+        var itens = _dataStore.Get(_textFilter, _filterDeletedItems);
+        
         foreach (var item in itens)
         {
             var daysToHardDelete = item.SoftDeletedIn.HasValue

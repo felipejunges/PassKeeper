@@ -2,6 +2,7 @@ using LiteDB;
 using LiteDB.Engine;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
+using PassKeeper.Gtk.Services.Migrations;
 
 namespace PassKeeper.Gtk.Services;
 
@@ -243,40 +244,28 @@ public class DataStore : IDataStore, IDisposable
     {
         var dbVersion = _db.UserVersion;
 
-        if (dbVersion > CurrentDbVersion)
-            throw new InvalidOperationException($"Database version {dbVersion} is newer than this app supports ({CurrentDbVersion}).");
+         if (dbVersion > CurrentDbVersion)
+             throw new InvalidOperationException($"Database version {dbVersion} is newer than this app supports ({CurrentDbVersion}).");
+        
+         if (dbVersion == CurrentDbVersion)
+             return;
 
-        if (dbVersion == CurrentDbVersion)
+        var migrations =
+            MigrationsDiscovery.GetListOfMigrations()
+                .Where(m => m.TargetVersion > dbVersion)
+                .OrderBy(m => m.TargetVersion)
+                .ToList();
+
+        if (!migrations.Any())
             return;
-
-        var items = _db.GetCollection<Item>("items");
-
+        
         _db.BeginTrans();
         
         try
         {
-            if (dbVersion < 1)
+            foreach (var migration in migrations)
             {
-                // TODO: set here the db parameters (configuration)
-                
-                items.EnsureIndex<string>(x => x.Title);
-                dbVersion = 1;
-            }
-
-            if (dbVersion < 2)
-            {
-                var now = DateTime.Now;
-
-                foreach (var doc in items.FindAll())
-                {
-                    if (doc.ModifiedAt != default)
-                        continue;
-                    
-                    doc.ModifiedAt = now;
-                    items.Update(doc);
-                }
-
-                dbVersion = 2;
+                migration.Apply(_db);
             }
 
             _db.Commit();
@@ -287,7 +276,7 @@ public class DataStore : IDataStore, IDisposable
             throw;
         }
 
-        _db.UserVersion = dbVersion;
+        _db.UserVersion = CurrentDbVersion;
     }
     
     public void Dispose()

@@ -5,8 +5,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyVersion>1.0.2</AssemblyVersion>
-        <FileVersion>1.0.2</FileVersion>
+        <AssemblyVersion>1.0.3</AssemblyVersion>
+        <FileVersion>1.0.3</FileVersion>
         <ApplicationIcon>app_logo_square_centered.ico</ApplicationIcon>
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>true</SelfContained>

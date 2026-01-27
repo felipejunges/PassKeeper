@@ -110,7 +110,7 @@ public class DataStore : IDataStore, IDisposable
 
     public Guid Add(ItemView itemView)
     {
-        var item = MapToItem(itemView);
+        var item = CreateItemViewView(itemView);
 
         _itens.Insert(item);
 
@@ -119,7 +119,22 @@ public class DataStore : IDataStore, IDisposable
 
     public void Update(ItemView itemView)
     {
-        var item = MapToItem(itemView);
+        var item = _itens.FindById(itemView.Id);
+
+        item.Title = itemView.Title;
+        item.Group = itemView.Group;
+        item.Username = itemView.Username;
+        item.Email = itemView.Email;
+        item.OtherInfo = itemView.OtherInfo;
+
+        if (itemView.PasswordChanged)
+        {
+            item.Password = itemView.Password == null
+                ? null
+                : AesEncryption.Encrypt(itemView.Password, GetPasswordsKey());
+            
+            item.ModifiedAt = DateTime.Now;
+        }
 
         _itens.Update(item);
     }
@@ -182,6 +197,10 @@ public class DataStore : IDataStore, IDisposable
     
     private ItemView MapToItemView(Item item, bool decryptPass)
     {
+        var password = !decryptPass || item.Password == null
+            ? null
+            : AesEncryption.Decrypt(item.Password, GetPasswordsKey());
+        
         var itemView = new ItemView
         {
             Id = item.Id,
@@ -190,14 +209,16 @@ public class DataStore : IDataStore, IDisposable
             Username = item.Username,
             Email = item.Email,
             OtherInfo = item.OtherInfo,
-            Password = !decryptPass || item.Password == null ? null : AesEncryption.Decrypt(item.Password, GetPasswordsKey()),
-            SoftDeletedIn = item.SoftDeletedIn
+            Password = password,
+            OriginalPassword = password,
+            SoftDeletedIn = item.SoftDeletedIn,
+            ModifiedAt = item.ModifiedAt
         };
 
         return itemView;
     }
 
-    private Item MapToItem(ItemView itemView)
+    private Item CreateItemViewView(ItemView itemView)
     {
         var item = new Item
         {
@@ -208,6 +229,7 @@ public class DataStore : IDataStore, IDisposable
             Email = itemView.Email,
             OtherInfo = itemView.OtherInfo,
             Password = itemView.Password == null ? null : AesEncryption.Encrypt(itemView.Password, GetPasswordsKey()),
+            ModifiedAt = DateTime.Now,
             SoftDeletedIn = itemView.SoftDeletedIn
         };
 

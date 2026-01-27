@@ -9,5 +9,6 @@ public class Item
     public string? Email { get; set; }
     public byte[]? Password { get; set; }
     public string? OtherInfo { get; set; }
+    public DateTime ModifiedAt { get; set; }
     public DateTime? SoftDeletedIn { get; set; }
 }

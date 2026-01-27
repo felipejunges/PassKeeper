@@ -408,6 +408,16 @@ public class MainWindow : Window
                 if ((string)_listStore.GetValue(it, 0) == id)
                 {
                     _treeView.Selection.SelectIter(it);
+                    
+                    var path = _listStore.GetPath(it);
+                    // Executa o scroll no loop idle para garantir que o TreeView já esteja pronto.
+                    GLib.Idle.Add(() =>
+                    {
+                        // useAlign = true e rowAlign = 0.5f centraliza a linha na área visível
+                        _treeView.ScrollToCell(path, null, true, 0.5f, 0);
+                        return false; // executa apenas uma vez
+                    });
+                    
                     break;
                 }
             } while (_listStore.IterNext(ref it));

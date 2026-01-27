@@ -2,6 +2,7 @@ using LiteDB;
 using LiteDB.Engine;
 using PassKeeper.Gtk.Interfaces.Services;
 using PassKeeper.Gtk.Models;
+using PassKeeper.Gtk.Services.Migrations;
 
 namespace PassKeeper.Gtk.Services;
 
@@ -13,6 +14,8 @@ public class DataStore : IDataStore, IDisposable
     private bool _disposed;
 
     public static TimeSpan TimeToHardDelete = TimeSpan.FromDays(30);
+    
+    private const int CurrentDbVersion = 2;
     
     public string FullDbPath { get; }
 
@@ -37,7 +40,8 @@ public class DataStore : IDataStore, IDisposable
         try
         {
             _db = new LiteDatabase(conn);
-            _db.UserVersion = 1;
+            
+            ValidateAndUpgrade();
             
             _itens = _db.GetCollection<Item>("items");
             _configuration = _db.GetCollection<AppConfiguration>("configuration");
@@ -236,6 +240,45 @@ public class DataStore : IDataStore, IDisposable
         return item;
     }
 
+    private void ValidateAndUpgrade()
+    {
+        var dbVersion = _db.UserVersion;
+
+         if (dbVersion > CurrentDbVersion)
+             throw new InvalidOperationException($"Database version {dbVersion} is newer than this app supports ({CurrentDbVersion}).");
+        
+         if (dbVersion == CurrentDbVersion)
+             return;
+
+        var migrations =
+            MigrationsDiscovery.GetListOfMigrations()
+                .Where(m => m.TargetVersion > dbVersion)
+                .OrderBy(m => m.TargetVersion)
+                .ToList();
+
+        if (!migrations.Any())
+            return;
+        
+        _db.BeginTrans();
+        
+        try
+        {
+            foreach (var migration in migrations)
+            {
+                migration.Apply(_db);
+            }
+
+            _db.Commit();
+        }
+        catch
+        {
+            _db.Rollback();
+            throw;
+        }
+
+        _db.UserVersion = CurrentDbVersion;
+    }
+    
     public void Dispose()
     {
         if (_disposed) return;

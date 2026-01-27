@@ -49,14 +49,15 @@ public class MainWindow : Window
 
         // TreeView setup
         _treeView = new TreeView();
-        _listStore = new ListStore(typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string));
+        _listStore = new ListStore(typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string));
         _treeView.Model = _listStore;
         _treeView.AppendColumn(NewTextColumn("ID", 0));
         _treeView.AppendColumn(NewTextColumn("Group", 1));
         _treeView.AppendColumn(NewTextColumn("Title", 2));
         _treeView.AppendColumn(NewTextColumn("Username", 3));
         _treeView.AppendColumn(NewTextColumn("Email", 4));
-        _treeView.AppendColumn(NewTextColumn("DEL?", 5));
+        _treeView.AppendColumn(NewTextColumn("Modified At", 5));
+        _treeView.AppendColumn(NewTextColumn("DEL?", 6));
 
         // I.A. sugeriu por conta do problema de não interceptar clique direito
         _treeView.AddEvents((int)Gdk.EventMask.ButtonPressMask);
@@ -373,6 +374,7 @@ public class MainWindow : Window
                 item.Title,
                 item.Username,
                 item.Email,
+                item.ModifiedAt.ToString(),
                 daysToHardDelete);
         }
     }

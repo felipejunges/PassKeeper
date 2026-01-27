@@ -49,7 +49,17 @@ public class MainWindow : Window
 
         // TreeView setup
         _treeView = new TreeView();
-        _listStore = new ListStore(typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string));
+        _listStore = new ListStore(
+            typeof(string), // 0 ID
+            typeof(string), // 1 Group
+            typeof(string), // 2 Title
+            typeof(string), // 3 Username
+            typeof(string), // 4 Email
+            typeof(string), // 5 Modified At
+            typeof(string), // 6 Delete in 
+            typeof(string)  // 7 Row color (foreground)
+        );
+        
         _treeView.Model = _listStore;
         _treeView.AppendColumn(NewTextColumn("ID", 0));
         _treeView.AppendColumn(NewTextColumn("Group", 1));
@@ -57,7 +67,7 @@ public class MainWindow : Window
         _treeView.AppendColumn(NewTextColumn("Username", 3));
         _treeView.AppendColumn(NewTextColumn("Email", 4));
         _treeView.AppendColumn(NewTextColumn("Modified At", 5));
-        _treeView.AppendColumn(NewTextColumn("DEL?", 6));
+        _treeView.AppendColumn(NewTextColumn("Delete in", 6));
 
         // I.A. sugeriu por conta do problema de não interceptar clique direito
         _treeView.AddEvents((int)Gdk.EventMask.ButtonPressMask);
@@ -87,8 +97,13 @@ public class MainWindow : Window
 
     private static TreeViewColumn NewTextColumn(string title, int index)
     {
-        var column = new TreeViewColumn(title, new CellRendererText(), "text", index);
-        column.Resizable = true;
+        var renderer = new CellRendererText();
+        var column = new TreeViewColumn { Title = title, Resizable = true, Sizing = TreeViewColumnSizing.Autosize };
+        column.PackStart(renderer, true);
+        column.AddAttribute(renderer, "text", index);
+
+        column.AddAttribute(renderer, "cell-background", 7);
+
         return column;
     }
 
@@ -368,6 +383,8 @@ public class MainWindow : Window
                 ? (item.SoftDeletedIn.Value.Add(DataStore.TimeToHardDelete) - DateTime.Now).ToDiasHoras()
                 : null;
             
+            var rowColor = item.SoftDeletedIn.HasValue ? "#FFCDD2" : null;
+            
             _listStore.AppendValues(
                 item.Id.ToString(),
                 item.Group,
@@ -375,7 +392,8 @@ public class MainWindow : Window
                 item.Username,
                 item.Email,
                 item.ModifiedAt.ToString(),
-                daysToHardDelete);
+                daysToHardDelete,
+                rowColor);
         }
     }
     

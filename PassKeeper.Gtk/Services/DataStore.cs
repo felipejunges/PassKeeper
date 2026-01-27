@@ -14,6 +14,8 @@ public class DataStore : IDataStore, IDisposable
 
     public static TimeSpan TimeToHardDelete = TimeSpan.FromDays(30);
     
+    private const int CurrentDbVersion = 2;
+    
     public string FullDbPath { get; }
 
     public DataStore(string? password, bool debug)
@@ -37,7 +39,8 @@ public class DataStore : IDataStore, IDisposable
         try
         {
             _db = new LiteDatabase(conn);
-            _db.UserVersion = 1;
+            
+            ValidateAndUpgrade();
             
             _itens = _db.GetCollection<Item>("items");
             _configuration = _db.GetCollection<AppConfiguration>("configuration");
@@ -236,6 +239,57 @@ public class DataStore : IDataStore, IDisposable
         return item;
     }
 
+    private void ValidateAndUpgrade()
+    {
+        var dbVersion = _db.UserVersion;
+
+        if (dbVersion > CurrentDbVersion)
+            throw new InvalidOperationException($"Database version {dbVersion} is newer than this app supports ({CurrentDbVersion}).");
+
+        if (dbVersion == CurrentDbVersion)
+            return;
+
+        var items = _db.GetCollection<Item>("items");
+
+        _db.BeginTrans();
+        
+        try
+        {
+            if (dbVersion < 1)
+            {
+                // TODO: set here the db parameters (configuration)
+                
+                items.EnsureIndex<string>(x => x.Title);
+                dbVersion = 1;
+            }
+
+            if (dbVersion < 2)
+            {
+                var now = DateTime.Now;
+
+                foreach (var doc in items.FindAll())
+                {
+                    if (doc.ModifiedAt != default)
+                        continue;
+                    
+                    doc.ModifiedAt = now;
+                    items.Update(doc);
+                }
+
+                dbVersion = 2;
+            }
+
+            _db.Commit();
+        }
+        catch
+        {
+            _db.Rollback();
+            throw;
+        }
+
+        _db.UserVersion = dbVersion;
+    }
+    
     public void Dispose()
     {
         if (_disposed) return;
